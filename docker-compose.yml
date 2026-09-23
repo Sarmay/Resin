@@ -1,11 +1,12 @@
 # docker-compose.yml
 services:
   resin:
-    image: ghcr.io/resinat/resin:latest
     build:
       context: .
+      dockerfile: Dockerfile
       args:
-        GROKIQ_VERSION: ${RESIN_VERSION:-}
+        RESIN_VERSION: ${RESIN_VERSION:-}
+    image: ghcr.io/resinat/resin:latest
     container_name: resin
     restart: unless-stopped
     environment:
@@ -19,3 +20,9 @@ services:
       - ./data/cache:/var/cache/resin
       - ./data/state:/var/lib/resin
       - ./data/log:/var/log/resin
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2260/healthz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
