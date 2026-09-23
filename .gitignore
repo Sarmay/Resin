@@ -9,3 +9,5 @@ start-instance.sh
 .claude/
 .omc/
 .local/
+data/
+.DS_Store
