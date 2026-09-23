@@ -18,7 +18,7 @@ import { formatBytes } from "../../lib/bytes";
 import { formatApiErrorMessage } from "../../lib/error-message";
 import { formatDateTime } from "../../lib/time";
 import { getSystemConfig } from "../systemConfig/api";
-import { getRequestLog, getRequestLogPayloads, listRequestLogs } from "./api";
+import { clearRequestLogs, getRequestLog, getRequestLogPayloads, listRequestLogs } from "./api";
 import type { RequestLogItem, RequestLogListFilters } from "./types";
 
 type BoolFilter = "all" | "true" | "false";
@@ -374,7 +374,7 @@ export function RequestLogsPage() {
     body: "",
   });
   const [payloadDecodePending, setPayloadDecodePending] = useState(false);
-  const { toasts, dismissToast } = useToast();
+  const { toasts, showToast, dismissToast } = useToast();
 
   const configQuery = useQuery({
     queryKey: ["system-config"],
@@ -883,6 +883,26 @@ export function RequestLogsPage() {
                 >
                   <RefreshCw size={14} className={logsQuery.isFetching ? "spin" : undefined} />
                   {t("刷新")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => {
+                    if (!window.confirm(t("确认清除全部请求日志？此操作不可撤销。"))) {
+                      return;
+                    }
+                    void clearRequestLogs()
+                      .then(async () => {
+                        showToast("success", t("请求日志已清除"));
+                        await logsQuery.refetch();
+                      })
+                      .catch((error: unknown) => {
+                        showToast("error", formatApiErrorMessage(error, t));
+                      });
+                  }}
+                  style={{ minHeight: "32px", height: "32px", padding: "0 0.75rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                >
+                  {t("清除日志")}
                 </Button>
                 <Button
                   size="sm"

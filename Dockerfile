@@ -22,12 +22,26 @@ ARG VERSION=dev
 ARG GIT_COMMIT=unknown
 ARG BUILD_TIME=unknown
 
-RUN CGO_ENABLED=0 go build -trimpath -tags "with_quic with_wireguard with_grpc with_utls" \
-  -ldflags="-s -w \
-  -X github.com/Resinat/Resin/internal/buildinfo.Version=${VERSION} \
-  -X github.com/Resinat/Resin/internal/buildinfo.GitCommit=${GIT_COMMIT} \
-  -X github.com/Resinat/Resin/internal/buildinfo.BuildTime=${BUILD_TIME}" \
-  -o /out/resin ./cmd/resin
+# An empty or default "dev" VERSION uses the committed VERSION file so
+# `docker compose up --build` shows the release version.
+RUN set -eu; \
+  ver="${VERSION}"; \
+  if [ -z "${ver}" ] || [ "${ver}" = "dev" ]; then \
+    if [ -f VERSION ]; then \
+      ver="$(tr -d '[:space:]' < VERSION)"; \
+    fi; \
+  fi; \
+  if [ -z "${ver}" ]; then ver="dev"; fi; \
+  commit="${GIT_COMMIT}"; \
+  if [ -z "${commit}" ]; then commit="unknown"; fi; \
+  built="${BUILD_TIME}"; \
+  if [ -z "${built}" ]; then built="unknown"; fi; \
+  CGO_ENABLED=0 go build -trimpath -tags "with_quic with_wireguard with_grpc with_utls" \
+    -ldflags="-s -w \
+    -X github.com/Resinat/Resin/internal/buildinfo.Version=${ver} \
+    -X github.com/Resinat/Resin/internal/buildinfo.GitCommit=${commit} \
+    -X github.com/Resinat/Resin/internal/buildinfo.BuildTime=${built}" \
+    -o /out/resin ./cmd/resin
 
 FROM alpine:3.21
 # NOTE: Keep this runtime stage in sync with .github/Dockerfile.release.

@@ -11,6 +11,9 @@ const EXACT_ZH_TO_EN: Record<string, string> = {
   "安全警告": "Security Warning",
   "退出登录": "Sign Out",
   "打开 Git 仓库": "Open Git repository",
+  "清除日志": "Clear logs",
+  "确认清除全部请求日志？此操作不可撤销。": "Clear all request logs? This cannot be undone.",
+  "请求日志已清除": "Request logs cleared",
   "仅 IPv4": "IPv4 only",
   "开启后，此平台不分配 IPv6 出口或 IPv6 服务器节点。":
     "When enabled, this platform does not assign IPv6 exits or IPv6 server nodes.",

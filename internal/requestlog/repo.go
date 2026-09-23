@@ -495,6 +495,45 @@ func (r *Repo) maybeRotate() error {
 	return nil
 }
 
+// ClearAll deletes every stored request log and keeps a fresh active database.
+func (r *Repo) ClearAll() error {
+	if r.activeDB != nil {
+		if _, err := r.activeDB.Exec(`DELETE FROM request_log_payloads`); err != nil {
+			return fmt.Errorf("requestlog clear payloads: %w", err)
+		}
+		if _, err := r.activeDB.Exec(`DELETE FROM request_logs`); err != nil {
+			return fmt.Errorf("requestlog clear logs: %w", err)
+		}
+	}
+
+	files, err := r.listDBFiles()
+	if err != nil {
+		return err
+	}
+	for _, path := range files {
+		if path == r.activePath {
+			continue
+		}
+		db, err := sql.Open("sqlite", path)
+		if err != nil {
+			return fmt.Errorf("requestlog clear open %s: %w", path, err)
+		}
+		_, payloadErr := db.Exec(`DELETE FROM request_log_payloads`)
+		_, logErr := db.Exec(`DELETE FROM request_logs`)
+		closeErr := db.Close()
+		if payloadErr != nil {
+			return fmt.Errorf("requestlog clear payloads %s: %w", path, payloadErr)
+		}
+		if logErr != nil {
+			return fmt.Errorf("requestlog clear logs %s: %w", path, logErr)
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+	}
+	return nil
+}
+
 func (r *Repo) cleanup() error {
 	files, err := r.listDBFiles()
 	if err != nil {

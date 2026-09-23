@@ -10,6 +10,21 @@ import (
 	"github.com/Resinat/Resin/internal/requestlog"
 )
 
+// HandleClearRequestLogs handles DELETE /api/v1/request-logs.
+func HandleClearRequestLogs(clear func() error) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if clear == nil {
+			writeInvalidArgument(w, "request logs are not enabled")
+			return
+		}
+		if err := clear(); err != nil {
+			WriteError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+			return
+		}
+		WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+}
+
 // HandleListRequestLogs handles GET /api/v1/request-logs.
 // Query params: from, to (RFC3339Nano), limit, cursor,
 // platform_id, platform_name, account, target_host, egress_ip, proxy_type, net_ok, http_status, fuzzy.

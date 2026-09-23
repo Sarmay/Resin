@@ -1,6 +1,7 @@
 package requestlog
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -18,8 +19,9 @@ type Service struct {
 	interval  time.Duration
 	flushReq  chan chan struct{}
 
-	stopCh chan struct{}
-	wg     sync.WaitGroup
+	stopCh   chan struct{}
+	clearReq chan chan error
+	wg       sync.WaitGroup
 }
 
 // ServiceConfig configures the request log service.
@@ -51,6 +53,7 @@ func NewService(cfg ServiceConfig) *Service {
 		interval:  interval,
 		flushReq:  make(chan chan struct{}, 64),
 		stopCh:    make(chan struct{}),
+		clearReq:  make(chan chan error, 1),
 	}
 }
 
@@ -78,6 +81,25 @@ func (s *Service) EmitRequestLog(entry proxy.RequestLogEntry) {
 	case s.queue <- entry:
 	default:
 		// Queue full — drop entry to avoid blocking hot path.
+	}
+}
+
+// Clear drops queued entries and deletes every stored request log.
+func (s *Service) Clear() error {
+	if s == nil || s.repo == nil {
+		return fmt.Errorf("request log service is not ready")
+	}
+	done := make(chan error, 1)
+	select {
+	case s.clearReq <- done:
+	case <-s.stopCh:
+		return fmt.Errorf("request log service is stopped")
+	}
+	select {
+	case err := <-done:
+		return err
+	case <-s.stopCh:
+		return fmt.Errorf("request log service is stopped")
 	}
 }
 
@@ -121,6 +143,10 @@ func (s *Service) flushLoop() {
 
 		case done := <-s.flushReq:
 			batch = s.flushOnBarrier(batch, done)
+
+		case done := <-s.clearReq:
+			s.discardQueued()
+			done <- s.repo.ClearAll()
 
 		case <-s.stopCh:
 			// Drain remaining.
@@ -166,6 +192,16 @@ drainLoop:
 		close(done)
 	}
 	return batch
+}
+
+func (s *Service) discardQueued() {
+	for {
+		select {
+		case <-s.queue:
+		default:
+			return
+		}
+	}
 }
 
 func (s *Service) drainAndFlush(batch []proxy.RequestLogEntry) {

@@ -14,6 +14,37 @@ import (
 
 func ptrInt(v int) *int { return &v }
 
+func TestRepo_ClearAllRemovesStoredLogs(t *testing.T) {
+	repo := NewRepo(t.TempDir(), 1<<20, 5)
+	if err := repo.Open(); err != nil {
+		t.Fatalf("repo.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = repo.Close() })
+
+	if _, err := repo.InsertBatch([]proxy.RequestLogEntry{{
+		ID:          "log-clear",
+		StartedAtNs: time.Now().UnixNano(),
+		ProxyType:   proxy.ProxyTypeForward,
+		TargetHost:  "example.com",
+		TargetURL:   "https://example.com/clear",
+		NetOK:       true,
+		HTTPMethod:  "GET",
+		HTTPStatus:  200,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.ClearAll(); err != nil {
+		t.Fatal(err)
+	}
+	rows, _, _, err := repo.List(ListFilter{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("logs after clear: got %d, want 0", len(rows))
+	}
+}
+
 func TestRepo_InsertListGetPayloads(t *testing.T) {
 	repo := NewRepo(t.TempDir(), 1<<20, 5)
 	if err := repo.Open(); err != nil {

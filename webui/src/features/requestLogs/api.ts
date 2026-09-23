@@ -23,6 +23,10 @@ function appendIfPresent(query: URLSearchParams, key: string, value: string | nu
   query.set(key, String(value));
 }
 
+export async function clearRequestLogs(): Promise<void> {
+  await apiRequest(`${basePath}`, { method: "DELETE" });
+}
+
 export async function listRequestLogs(filters: RequestLogListFilters): Promise<RequestLogListResponse> {
   const query = new URLSearchParams();
   appendIfPresent(query, "from", filters.from);

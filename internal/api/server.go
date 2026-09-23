@@ -31,6 +31,7 @@ func NewServer(
 	apiMaxBodyBytes int64,
 	requestlogRepo *requestlog.Repo,
 	metricsManager *metrics.Manager,
+	clearRequestLogs func() error,
 ) *Server {
 	return NewServerWithAddress(
 		"",
@@ -43,6 +44,7 @@ func NewServer(
 		apiMaxBodyBytes,
 		requestlogRepo,
 		metricsManager,
+		clearRequestLogs,
 	)
 }
 
@@ -58,6 +60,7 @@ func NewServerWithAddress(
 	apiMaxBodyBytes int64,
 	requestlogRepo *requestlog.Repo,
 	metricsManager *metrics.Manager,
+	clearRequestLogs func() error,
 ) *Server {
 	mux := http.NewServeMux()
 
@@ -133,6 +136,9 @@ func NewServerWithAddress(
 
 	// Request log endpoints (always registered if repo is available).
 	if requestlogRepo != nil {
+		if clearRequestLogs != nil {
+			authed.Handle("DELETE /api/v1/request-logs", HandleClearRequestLogs(clearRequestLogs))
+		}
 		authed.Handle("GET /api/v1/request-logs", HandleListRequestLogs(requestlogRepo))
 		authed.Handle("GET /api/v1/request-logs/{log_id}", HandleGetRequestLog(requestlogRepo))
 		authed.Handle("GET /api/v1/request-logs/{log_id}/payloads", HandleGetRequestLogPayloads(requestlogRepo))

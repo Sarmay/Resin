@@ -399,6 +399,7 @@ func (a *resinApp) buildNetworkServers(engine *state.StateEngine) error {
 		int64(a.envCfg.APIMaxBodyBytes),
 		a.requestlogRepo,
 		a.metricsManager,
+		a.requestlogSvc.Clear,
 	)
 	tokenActionHandler := api.NewTokenActionHandler(
 		a.envCfg.ProxyToken,

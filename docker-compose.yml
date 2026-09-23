@@ -5,7 +5,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        RESIN_VERSION: ${RESIN_VERSION:-}
+        # Dockerfile reads VERSION. An empty value falls back to the VERSION file
+        # instead of the image default "dev".
+        VERSION: ${RESIN_VERSION:-}
     image: ghcr.io/resinat/resin:latest
     container_name: resin
     restart: unless-stopped
