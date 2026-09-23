@@ -3,7 +3,7 @@ services:
   resin:
     image: ghcr.io/resinat/resin:latest
     build:
-      context: ./backend
+      context: .
       args:
         GROKIQ_VERSION: ${RESIN_VERSION:-}
     container_name: resin
