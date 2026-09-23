@@ -201,7 +201,7 @@ func HandleOpenNodeCircuit(cp *service.ControlPlaneService) http.HandlerFunc {
 // HandleHealthySubscription returns a handler for GET /api/v1/healthy-subscription.
 func HandleHealthySubscription(cp *service.ControlPlaneService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		body, contentType, err := cp.RenderHealthySubscription(r.URL.Query().Get("format"))
+		body, contentType, err := cp.RenderHealthySubscription(r.URL.Query().Get("format"), r.URL.Query().Get("platform"))
 		if err != nil {
 			writeServiceError(w, err)
 			return

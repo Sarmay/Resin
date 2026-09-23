@@ -18,7 +18,41 @@ func registerEmbeddedWebUI(mux *http.ServeMux) {
 	}
 	mux.Handle("/", newRootRedirectHandler())
 	mux.Handle("/ui", newUIRootRedirectHandler())
+	mux.Handle("GET /llms.txt", publicMarkdownHandler(distFS, "llms.txt"))
+	mux.Handle("GET /docs.md", publicGuideHandler(distFS))
 	mux.Handle("/ui/", newWebUIHandler(distFS))
+}
+
+func publicGuideHandler(distFS fs.FS) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := "user-guide.zh-CN.md"
+		if strings.HasPrefix(strings.ToLower(r.URL.Query().Get("lang")), "en") {
+			name = "user-guide.en.md"
+		}
+		publicMarkdownHandler(distFS, name).ServeHTTP(w, r)
+	})
+}
+
+func publicMarkdownHandler(distFS fs.FS, name string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.NotFound(w, r)
+			return
+		}
+		data, err := fs.ReadFile(distFS, name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if name == "llms.txt" {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		} else {
+			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		}
+		w.Header().Set("Cache-Control", "no-cache")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(data)
+	})
 }
 
 func newWebUIHandler(distFS fs.FS) http.Handler {

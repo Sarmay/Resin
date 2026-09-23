@@ -218,6 +218,11 @@ export function PlatformAccessPanel({ platformName }: PlatformAccessPanelProps) 
     const socksForward = `socks5h://${userInfo}@${host}`;
 
     const reverseTokenSeg = proxyTokenSet ? encodeSegment(tokenRaw || TOKEN_PLACEHOLDER) : "";
+    const healthyTokenSeg = reverseTokenSeg || "public";
+    const platformQuery = encodeURIComponent(platform);
+    const healthyBase = `${scheme}://${host}/${healthyTokenSeg}/api/v1/healthy-subscription?platform=${platformQuery}`;
+    const healthyForward = `${healthyBase}&format=uri`;
+    const healthyReverse = `${healthyBase}&format=sing-box`;
     const parsed = parseTarget(target);
     const reverseUrl = parsed
       ? `${scheme}://${host}/${reverseTokenSeg}/${identityEnc}/${parsed.protocol}/${parsed.rest}`
@@ -233,7 +238,7 @@ export function PlatformAccessPanel({ platformName }: PlatformAccessPanelProps) 
     ].join(" ");
     const curlReverse = reverseUrl ? `curl ${shellQuote(reverseUrl)}` : "";
 
-    return { httpForward, socksForward, reverseUrl, curlForward, curlReverse };
+    return { httpForward, socksForward, reverseUrl, curlForward, curlReverse, healthyForward, healthyReverse };
   }, [platformName, account, token, proxyTokenSet, host, scheme, target]);
 
   const copyLabel = t("复制");
@@ -314,6 +319,13 @@ export function PlatformAccessPanel({ platformName }: PlatformAccessPanelProps) 
           copyLabel={copyLabel}
           copiedLabel={copiedLabel}
         />
+        <CopyField
+          label={t("仅健康节点订阅")}
+          value={urls.healthyForward}
+          hint={t("只包含此平台当前健康且已有出口 IP 的节点，base64 URI。")}
+          copyLabel={copyLabel}
+          copiedLabel={copiedLabel}
+        />
       </div>
 
       <div className="platform-access-group">
@@ -340,6 +352,13 @@ export function PlatformAccessPanel({ platformName }: PlatformAccessPanelProps) 
             <CopyField
               label={t("curl 示例")}
               value={urls.curlReverse}
+              copyLabel={copyLabel}
+              copiedLabel={copiedLabel}
+            />
+            <CopyField
+              label={t("仅健康节点订阅")}
+              value={urls.healthyReverse}
+              hint={t("只包含此平台当前健康且已有出口 IP 的节点，sing-box JSON。")}
               copyLabel={copyLabel}
               copiedLabel={copiedLabel}
             />

@@ -102,6 +102,7 @@ Note: Once enabled, requests without authentication information are rejected ins
   "资源": "Resources",
   "系统配置": "System Config",
   "使用文档": "Documentation",
+  "Markdown": "Markdown",
   "当前版本的操作说明。切换语言会切换文档语言。": "Operating notes for the current version. The document language follows the selected language.",
   "文档目录": "Documentation contents",
   "刷新": "Refresh",
@@ -368,6 +369,11 @@ Note: Once enabled, requests without authentication information are rejected ins
   "目标网址": "Target URL",
   "例如 https://api.ipify.org": "e.g. https://api.ipify.org",
   "反向代理地址": "Reverse Proxy URL",
+  "仅健康节点订阅": "Healthy nodes only",
+  "只包含此平台当前健康且已有出口 IP 的节点，base64 URI。":
+    "Only nodes that are healthy for this platform and already have an egress IP, as a base64 URI list.",
+  "只包含此平台当前健康且已有出口 IP 的节点，sing-box JSON。":
+    "Only nodes that are healthy for this platform and already have an egress IP, as sing-box JSON.",
   "请输入合法的 http/https 目标网址以生成反向代理地址。":
     "Enter a valid http/https target URL to generate the reverse proxy URL.",
   "复制": "Copy",

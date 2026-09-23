@@ -12,12 +12,25 @@ import (
 )
 
 // RenderHealthySubscription returns a subscription document containing currently healthy nodes.
-func (s *ControlPlaneService) RenderHealthySubscription(format string) ([]byte, string, error) {
+// platformName limits the result to that platform's routable view. Empty includes every healthy node.
+func (s *ControlPlaneService) RenderHealthySubscription(format, platformName string) ([]byte, string, error) {
 	if s == nil || s.Pool == nil {
 		return nil, "", internal("healthy subscription", fmt.Errorf("pool is not configured"))
 	}
+	platformName = strings.TrimSpace(platformName)
+	var view interface{ Contains(node.Hash) bool }
+	if platformName != "" {
+		plat, ok := s.Pool.GetPlatformByName(platformName)
+		if !ok {
+			return nil, "", notFound("platform not found")
+		}
+		view = plat.View()
+	}
 	raws := make([]json.RawMessage, 0)
-	s.Pool.RangeNodes(func(_ node.Hash, entry *node.NodeEntry) bool {
+	s.Pool.RangeNodes(func(hash node.Hash, entry *node.NodeEntry) bool {
+		if view != nil && !view.Contains(hash) {
+			return true
+		}
 		if entry == nil || !entry.IsHealthy() || !entry.GetEgressIP().IsValid() || len(entry.RawOptions) == 0 {
 			return true
 		}

@@ -1516,7 +1516,7 @@ Body（partial patch 示例）：
 
 #### 健康节点订阅
 
-**GET** `/healthy-subscription?format=uri|sing-box`
+**GET** `/healthy-subscription?format=uri|sing-box&platform={name}`
 
 管理 API 使用管理员令牌。给手机或客户端导入时使用代理令牌路径：
 

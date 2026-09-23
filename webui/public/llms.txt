@@ -1,0 +1,9 @@
+# Resin
+
+Public documentation. No authentication.
+
+- [Chinese user guide](/ui/user-guide.zh-CN.md)
+- [English user guide](/ui/user-guide.en.md)
+- [HTML](/ui/docs)
+- [Chinese alias](/docs.md)
+- [English alias](/docs.md?lang=en)

@@ -23,6 +23,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/docs" element={<DocsPage />} />
 
       <Route
         element={
@@ -42,7 +43,6 @@ export function AppRoutes() {
         <Route path="/request-logs" element={<RequestLogsPage />} />
         <Route path="/resources" element={<GeoIPPage />} />
         <Route path="/system-config" element={<SystemConfigPage />} />
-        <Route path="/docs" element={<DocsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -51,7 +51,7 @@ func NewTokenActionHandler(proxyToken string, cp *service.ControlPlaneService, a
 			http.NotFound(w, r)
 			return
 		}
-		body, contentType, err := cp.RenderHealthySubscription(r.URL.Query().Get("format"))
+		body, contentType, err := cp.RenderHealthySubscription(r.URL.Query().Get("format"), r.URL.Query().Get("platform"))
 		if err != nil {
 			writeServiceError(w, err)
 			return
