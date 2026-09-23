@@ -34,11 +34,15 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
-function buildURL(path: string): string {
-  if (path.startsWith("http://") || path.startsWith("https://")) {
-    return path;
-  }
-  return `${API_BASE_URL}${path}`;
+// Browsers reject fetch() when the resolved URL keeps username or password
+// copied from the page address, for example http://user:token@host/ui/.
+export function apiURL(path: string): string {
+  const raw = path.startsWith("http://") || path.startsWith("https://") ? path : `${API_BASE_URL}${path}`;
+  const base = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
+  const url = new URL(raw, base);
+  url.username = "";
+  url.password = "";
+  return url.toString();
 }
 
 async function parseErrorBody(response: Response): Promise<ApiErrorBody | null> {
@@ -69,7 +73,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 
-  const response = await fetch(buildURL(path), {
+  const response = await fetch(apiURL(path), {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),

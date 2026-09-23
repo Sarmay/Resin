@@ -8,8 +8,8 @@ import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
+import { ApiError, apiRequest, apiURL } from "../../lib/api-client";
 import { useAuthStore } from "./auth-store";
-import { apiRequest, ApiError } from "../../lib/api-client";
 import { useI18n } from "../../i18n";
 
 const formSchema = z.object({
@@ -50,7 +50,7 @@ export function LoginPage() {
 
     const checkAuthMode = async () => {
       try {
-        const response = await fetch("/api/v1/system/info", {
+        const response = await fetch(apiURL("/api/v1/system/info"), {
           method: "GET",
           signal: controller.signal,
         });

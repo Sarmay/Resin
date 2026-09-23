@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { apiURL } from "../../lib/api-client";
 import { useAuthStore } from "./auth-store";
 
 type RequireAuthProps = {
@@ -32,7 +33,7 @@ export function RequireAuth({ children }: RequireAuthProps) {
         if (probeToken) {
           headers.set("Authorization", `Bearer ${probeToken}`);
         }
-        const response = await fetch("/api/v1/system/info", {
+        const response = await fetch(apiURL("/api/v1/system/info"), {
           method: "GET",
           headers,
           signal: controller.signal,
