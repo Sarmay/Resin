@@ -102,6 +102,7 @@ func NewServerWithAddress(
 		// Subscriptions.
 		authed.Handle("GET /api/v1/subscriptions", HandleListSubscriptions(cp))
 		authed.Handle("POST /api/v1/subscriptions", HandleCreateSubscription(cp))
+		authed.Handle("POST /api/v1/subscriptions/batch", HandleBatchCreateSubscriptions(cp))
 		authed.Handle("GET /api/v1/subscriptions/{id}", HandleGetSubscription(cp))
 		authed.Handle("PATCH /api/v1/subscriptions/{id}", HandleUpdateSubscription(cp))
 		authed.Handle("DELETE /api/v1/subscriptions/{id}", HandleDeleteSubscription(cp))
@@ -118,6 +119,8 @@ func NewServerWithAddress(
 		// Nodes.
 		authed.Handle("GET /api/v1/nodes", HandleListNodes(cp))
 		authed.Handle("GET /api/v1/nodes/{hash}", HandleGetNode(cp))
+		authed.Handle("POST /api/v1/nodes/{hash}/actions/open-circuit", HandleOpenNodeCircuit(cp))
+		authed.Handle("GET /api/v1/healthy-subscription", HandleHealthySubscription(cp))
 		authed.Handle("POST /api/v1/nodes/{hash}/actions/probe-egress", HandleProbeEgress(cp))
 		authed.Handle("POST /api/v1/nodes/{hash}/actions/probe-latency", HandleProbeLatency(cp))
 

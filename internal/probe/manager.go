@@ -44,6 +44,10 @@ type ProbeConfig struct {
 	// The kind parameter is "egress" or "latency".
 	OnProbeEvent func(kind string)
 
+	// NodeProbeInterval overrides the global probe interval for one node.
+	// A non-positive result keeps the global interval. Zero means inherit.
+	NodeProbeInterval func(hash node.Hash) time.Duration
+
 	// ChooseNormalWhenBoth chooses whether to pop normal-priority queue when
 	// both high and normal queues are non-empty.
 	// Nil defaults to 10% chance.
@@ -68,6 +72,7 @@ type ProbeManager struct {
 	latencyTestURL                  func() string
 	latencyAuthorities              func() []string
 	onProbeEvent                    func(kind string)
+	nodeProbeInterval               func(hash node.Hash) time.Duration
 }
 
 const (
@@ -270,6 +275,7 @@ func NewProbeManager(cfg ProbeConfig) *ProbeManager {
 		latencyTestURL:                  cfg.LatencyTestURL,
 		latencyAuthorities:              cfg.LatencyAuthorities,
 		onProbeEvent:                    cfg.OnProbeEvent,
+		nodeProbeInterval:               cfg.NodeProbeInterval,
 	}
 }
 
@@ -458,9 +464,15 @@ func (m *ProbeManager) scanEgress() {
 		}
 
 		// Check if due: lastAttempt + interval - lookahead <= now.
+		nodeInterval := interval
+		if m.nodeProbeInterval != nil {
+			if override := m.nodeProbeInterval(h); override > 0 {
+				nodeInterval = override
+			}
+		}
 		lastCheck := entry.LastEgressUpdateAttempt.Load()
 		if lastCheck > 0 {
-			nextDue := time.Unix(0, lastCheck).Add(interval).Add(-lookahead)
+			nextDue := time.Unix(0, lastCheck).Add(nodeInterval).Add(-lookahead)
 			if now.Before(nextDue) {
 				return true // not yet due
 			}
@@ -505,7 +517,15 @@ func (m *ProbeManager) scanLatency() {
 			return true // skip nil outbound
 		}
 
-		if !m.isLatencyProbeDue(entry, now, maxLatencyInterval, maxAuthorityInterval, authorities, lookahead) {
+		latencyInterval := maxLatencyInterval
+		authorityInterval := maxAuthorityInterval
+		if m.nodeProbeInterval != nil {
+			if override := m.nodeProbeInterval(h); override > 0 {
+				latencyInterval = override
+				authorityInterval = override
+			}
+		}
+		if !m.isLatencyProbeDue(entry, now, latencyInterval, authorityInterval, authorities, lookahead) {
 			return true
 		}
 

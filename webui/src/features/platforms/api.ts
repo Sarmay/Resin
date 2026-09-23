@@ -18,6 +18,7 @@ type ApiPlatform = Omit<Platform, "regex_filters" | "region_filters"> & {
   reverse_proxy_empty_account_behavior?: Platform["reverse_proxy_empty_account_behavior"] | null;
   reverse_proxy_fixed_account_header?: string | null;
   passive_circuit_breaker_disabled?: boolean | null;
+  ipv4_only?: boolean | null;
 };
 
 type ApiPlatformLease = Partial<PlatformLease>;
@@ -46,6 +47,7 @@ function normalizePlatform(raw: ApiPlatform): Platform {
       typeof raw.reverse_proxy_fixed_account_header === "string" ? raw.reverse_proxy_fixed_account_header : "",
     passive_circuit_breaker_disabled:
       typeof raw.passive_circuit_breaker_disabled === "boolean" ? raw.passive_circuit_breaker_disabled : false,
+    ipv4_only: raw.ipv4_only === true,
   };
 }
 

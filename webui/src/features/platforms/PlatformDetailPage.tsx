@@ -604,6 +604,26 @@ export function PlatformDetailPage() {
                   </div>
 
                   <div className="field-group">
+                    <label className="field-label" htmlFor="detail-edit-ipv4-only" style={{ visibility: "hidden" }}>
+                      {t("仅 IPv4")}
+                    </label>
+                    <div className="subscription-switch-item">
+                      <label className="subscription-switch-label" htmlFor="detail-edit-ipv4-only">
+                        <span>{t("仅 IPv4")}</span>
+                        <span
+                          className="subscription-info-icon"
+                          title={t("开启后，此平台不分配 IPv6 出口或 IPv6 服务器节点。")}
+                          aria-label={t("开启后，此平台不分配 IPv6 出口或 IPv6 服务器节点。")}
+                          tabIndex={0}
+                        >
+                          <Info size={13} />
+                        </span>
+                      </label>
+                      <Switch id="detail-edit-ipv4-only" {...editForm.register("ipv4_only")} />
+                    </div>
+                  </div>
+
+                  <div className="field-group">
                     <label className="field-label" htmlFor="detail-edit-empty-account-behavior">
                       {t("反向代理账号为空行为")}
                     </label>

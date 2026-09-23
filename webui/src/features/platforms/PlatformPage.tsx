@@ -308,6 +308,26 @@ export function PlatformPage() {
               </div>
 
               <div className="field-group">
+                <label className="field-label" htmlFor="create-ipv4-only" style={{ visibility: "hidden" }}>
+                  {t("仅 IPv4")}
+                </label>
+                <div className="subscription-switch-item">
+                  <label className="subscription-switch-label" htmlFor="create-ipv4-only">
+                    <span>{t("仅 IPv4")}</span>
+                    <span
+                      className="subscription-info-icon"
+                      title={t("开启后，此平台不分配 IPv6 出口或 IPv6 服务器节点。")}
+                      aria-label={t("开启后，此平台不分配 IPv6 出口或 IPv6 服务器节点。")}
+                      tabIndex={0}
+                    >
+                      <Info size={13} />
+                    </span>
+                  </label>
+                  <Switch id="create-ipv4-only" {...createForm.register("ipv4_only")} />
+                </div>
+              </div>
+
+              <div className="field-group">
                 <label className="field-label" htmlFor="create-empty-account-behavior">
                   {t("反向代理账号为空行为")}
                 </label>

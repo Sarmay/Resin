@@ -250,6 +250,13 @@ func newTopologyRuntime(
 	probeMgr := probe.NewProbeManager(probe.ProbeConfig{
 		Pool:        pool,
 		Concurrency: envCfg.ProbeConcurrency,
+		NodeProbeInterval: func(hash node.Hash) time.Duration {
+			entry, ok := pool.GetEntry(hash)
+			if !ok {
+				return 0
+			}
+			return subManager.MinProbeInterval(entry.SubscriptionIDs())
+		},
 		Fetcher: func(hash node.Hash, url string) ([]byte, time.Duration, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), envCfg.ProbeTimeout)
 			defer cancel()
@@ -363,6 +370,8 @@ func bootstrapTopology(
 		sub.SetFetchConfig(ms.URL, ms.UpdateIntervalNs)
 		sub.SetSourceType(ms.SourceType)
 		sub.SetContent(ms.Content)
+		sub.SetUserAgent(ms.UserAgent)
+		sub.SetProbeIntervalNs(ms.ProbeIntervalNs)
 		sub.SetIncrementalAliveNodes(ms.IncrementalAliveNodes)
 		sub.SetEphemeralNodeEvictDelayNs(ms.EphemeralNodeEvictDelayNs)
 		sub.CreatedAtNs = ms.CreatedAtNs

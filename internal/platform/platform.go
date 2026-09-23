@@ -1,8 +1,10 @@
 package platform
 
 import (
+	"encoding/json"
 	"net/netip"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/Resinat/Resin/internal/node"
@@ -40,6 +42,7 @@ type Platform struct {
 	ReverseProxyFixedAccountHeaders  []string
 	AllocationPolicy                 AllocationPolicy
 	PassiveCircuitBreakerDisabled    bool
+	IPv4Only                         bool
 
 	// Routable view & its lock.
 	// viewMu serializes both FullRebuild and NotifyDirty.
@@ -141,6 +144,11 @@ func (p *Platform) evaluateNode(
 		return false
 	}
 
+	// 3b. Optional IPv4-only platforms skip IPv6 exits and IPv6 server literals.
+	if p.IPv4Only && nodeUsesIPv6(entry, egressIP) {
+		return false
+	}
+
 	// 4. Region filter (when configured).
 	if len(p.RegionFilters) > 0 {
 		region := entry.GetRegion(geoLookup)
@@ -189,4 +197,27 @@ func MatchRegionFilter(region string, filters []string) bool {
 		return false
 	}
 	return true
+}
+
+func nodeUsesIPv6(entry *node.NodeEntry, egressIP netip.Addr) bool {
+	if isIPv6(egressIP) {
+		return true
+	}
+	if entry == nil || len(entry.RawOptions) == 0 {
+		return false
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(entry.RawOptions, &raw); err != nil {
+		return false
+	}
+	if strategy, _ := raw["domain_strategy"].(string); strings.EqualFold(strategy, "ipv6_only") {
+		return true
+	}
+	server, _ := raw["server"].(string)
+	addr, err := netip.ParseAddr(strings.Trim(server, "[]"))
+	return err == nil && isIPv6(addr)
+}
+
+func isIPv6(addr netip.Addr) bool {
+	return addr.IsValid() && addr.Is6() && !addr.Is4In6()
 }

@@ -297,6 +297,9 @@ func TestMigrateStateDB_AddsIncrementalAliveNodesToLegacySubscriptions(t *testin
 	if ok, err := hasTableColumn(db, "subscriptions", "incremental_alive_nodes"); err != nil || !ok {
 		t.Fatalf("expected migrated column subscriptions.incremental_alive_nodes, ok=%v err=%v", ok, err)
 	}
+	if ok, err := hasTableColumn(db, "subscriptions", "user_agent"); err != nil || !ok {
+		t.Fatalf("expected migrated column subscriptions.user_agent, ok=%v err=%v", ok, err)
+	}
 
 	var version int
 	var dirty bool
@@ -655,7 +658,7 @@ func TestStateRepo_Subscriptions_CRUD(t *testing.T) {
 	now := time.Now().UnixNano()
 
 	s := model.Subscription{
-		ID: "sub-1", Name: "MySub", URL: "https://example.com/sub",
+		ID: "sub-1", Name: "MySub", URL: "https://example.com/sub", UserAgent: "FlClash/0.8.92",
 		UpdateIntervalNs: int64(30 * time.Second), Enabled: true,
 		Ephemeral: false, EphemeralNodeEvictDelayNs: int64(72 * time.Hour), CreatedAtNs: now, UpdatedAtNs: now,
 	}
@@ -667,7 +670,7 @@ func TestStateRepo_Subscriptions_CRUD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 1 || list[0].URL != "https://example.com/sub" {
+	if len(list) != 1 || list[0].URL != "https://example.com/sub" || list[0].UserAgent != "FlClash/0.8.92" {
 		t.Fatalf("unexpected list: %+v", list)
 	}
 

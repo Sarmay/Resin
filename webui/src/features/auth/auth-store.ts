@@ -35,3 +35,23 @@ export const useAuthStore = create<AuthState>((set) => ({
 export function getStoredAuthToken(): string {
   return useAuthStore.getState().token;
 }
+
+function syncTokenFromStorage(value: string | null) {
+  const next = value?.trim() ?? "";
+  if (useAuthStore.getState().token !== next) {
+    useAuthStore.setState({ token: next });
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key === null) {
+      syncTokenFromStorage(window.localStorage.getItem(TOKEN_KEY));
+      return;
+    }
+    if (event.key !== TOKEN_KEY) {
+      return;
+    }
+    syncTokenFromStorage(event.newValue);
+  });
+}

@@ -101,7 +101,7 @@ func (mn *ManagedNodes) RangeNodes(fn func(node.Hash, ManagedNode) bool) {
 // Subscription represents a subscription's runtime state.
 // It has two synchronization layers:
 //   - mu protects mutable config fields
-//     (url/updateInterval/name/enabled/ephemeral/ephemeralNodeEvictDelayNs).
+//     (url/userAgent/updateInterval/name/enabled/ephemeral/ephemeralNodeEvictDelayNs).
 //   - opMu serializes high-level operations (update/rename/eviction/delete)
 //     on the same subscription instance.
 //
@@ -116,10 +116,12 @@ type Subscription struct {
 	opMu sync.Mutex
 
 	// Mutable fields guarded by mu.
-	mu         sync.RWMutex
-	url        string
-	sourceType string
-	content    string
+	mu              sync.RWMutex
+	url             string
+	sourceType      string
+	content         string
+	userAgent       string
+	probeIntervalNs int64
 	// updateIntervalNs is the configured subscription refresh interval.
 	updateIntervalNs      int64
 	name                  string
@@ -149,7 +151,7 @@ type Subscription struct {
 	managedNodes atomic.Pointer[ManagedNodes]
 
 	// configVersion is incremented whenever refresh-input-related config changes
-	// (URL/source/content/update-interval). Scheduler uses it for stale-guard.
+	// (URL/user-agent/source/content/update-interval). Scheduler uses it for stale-guard.
 	configVersion atomic.Int64
 }
 
@@ -214,6 +216,39 @@ func (s *Subscription) Content() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.content
+}
+
+// UserAgent returns the subscription download User-Agent.
+// An empty value means the process default.
+func (s *Subscription) UserAgent() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.userAgent
+}
+
+// SetUserAgent updates the subscription download User-Agent (thread-safe).
+func (s *Subscription) SetUserAgent(userAgent string) {
+	s.mu.Lock()
+	if s.userAgent != userAgent {
+		s.userAgent = userAgent
+		s.configVersion.Add(1)
+	}
+	s.mu.Unlock()
+}
+
+// ProbeIntervalNs returns the per-subscription probe interval.
+// Zero means the process-wide probe interval.
+func (s *Subscription) ProbeIntervalNs() int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.probeIntervalNs
+}
+
+// SetProbeIntervalNs updates the per-subscription probe interval.
+func (s *Subscription) SetProbeIntervalNs(v int64) {
+	s.mu.Lock()
+	s.probeIntervalNs = v
+	s.mu.Unlock()
 }
 
 // ConfigVersion returns the scheduler input config version.

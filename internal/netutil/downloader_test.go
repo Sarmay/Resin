@@ -108,4 +108,12 @@ func TestDirectDownloader_DynamicUserAgentPulled(t *testing.T) {
 	if string(body) != "agent-b" {
 		t.Fatalf("expected second UA agent-b, got %q", string(body))
 	}
+
+	body, err = d.Download(WithDownloadUserAgent(context.Background(), "subscription-ua"), srv.URL)
+	if err != nil {
+		t.Fatalf("override download failed: %v", err)
+	}
+	if string(body) != "subscription-ua" {
+		t.Fatalf("expected context UA subscription-ua, got %q", string(body))
+	}
 }

@@ -22,6 +22,7 @@ import { formatApiErrorMessage } from "../../lib/error-message";
 import { formatDateTime, formatGoDuration, formatRelativeTime } from "../../lib/time";
 import {
   cleanupSubscriptionCircuitOpenNodes,
+  batchCreateSubscriptions,
   createSubscription,
   deleteSubscription,
   listSubscriptions,
@@ -48,6 +49,20 @@ const subscriptionCreateSchema = z.object({
   url: z.string(),
   content: z.string(),
   update_interval: z.string().trim().min(1, "更新间隔不能为空"),
+  user_agent: z
+    .string()
+    .trim()
+    .max(256, "User-Agent 不能超过 256 个字符")
+    .refine((value) => {
+      for (let index = 0; index < value.length; index += 1) {
+        const code = value.charCodeAt(index);
+        if (code < 32 || code === 127) {
+          return false;
+        }
+      }
+      return true;
+    }, "User-Agent 包含非法字符"),
+  probe_interval: z.string().trim().optional(),
   ephemeral_node_evict_delay: z.string().trim().min(1, "临时节点驱逐延迟不能为空"),
   enabled: z.boolean(),
   ephemeral: z.boolean(),
@@ -80,6 +95,7 @@ const LOCAL_SOURCE_UPDATE_INTERVAL = "12h";
 const SUBSCRIPTION_DISABLE_HINT = "禁用订阅后，相关节点不会参与平台路由、健康统计或自动探测。";
 const SUBSCRIPTION_EPHEMERAL_HINT = "临时订阅的非健康节点会在一段时间后被自动删除。订阅本身不会被删除。";
 const SUBSCRIPTION_INCREMENTAL_HINT = "开启后刷新时保留当前仍存活的旧节点，仅清理失效旧节点，并合并新订阅内容；关闭后仅保留刷新后的订阅内容。";
+const SUBSCRIPTION_USER_AGENT_HINT = "留空时使用默认 User-Agent：clash.meta。部分订阅源会校验客户端标识。";
 
 function extractHostname(url: string): string {
   try {
@@ -95,6 +111,8 @@ function subscriptionToEditForm(subscription: Subscription): SubscriptionEditFor
     source_type: subscription.source_type,
     url: subscription.url,
     content: subscription.content ?? "",
+    user_agent: subscription.user_agent ?? "",
+    probe_interval: subscription.probe_interval ?? "",
     update_interval: subscription.update_interval,
     ephemeral_node_evict_delay: subscription.ephemeral_node_evict_delay,
     enabled: subscription.enabled,
@@ -133,6 +151,9 @@ export function SubscriptionPage() {
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [batchText, setBatchText] = useState("");
+  const [batchNameRegex, setBatchNameRegex] = useState("");
   const [pendingRefreshIds, setPendingRefreshIds] = useState<Set<string>>(() => new Set());
   const [pendingEnabledStates, setPendingEnabledStates] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const { toasts, showToast, dismissToast } = useToast();
@@ -188,6 +209,8 @@ export function SubscriptionPage() {
       source_type: "remote",
       url: "",
       content: "",
+      user_agent: "",
+      probe_interval: "",
       update_interval: "12h",
       ephemeral_node_evict_delay: "72h",
       enabled: true,
@@ -206,6 +229,8 @@ export function SubscriptionPage() {
       source_type: "remote",
       url: "",
       content: "",
+      user_agent: "",
+      probe_interval: "",
       update_interval: "12h",
       ephemeral_node_evict_delay: "72h",
       enabled: true,
@@ -262,6 +287,8 @@ export function SubscriptionPage() {
         url: "",
         content: "",
         update_interval: LOCAL_SOURCE_UPDATE_INTERVAL,
+        user_agent: "",
+      probe_interval: "",
         ephemeral_node_evict_delay: "72h",
         enabled: true,
         ephemeral: false,
@@ -287,8 +314,9 @@ export function SubscriptionPage() {
         enabled: formData.enabled,
         ephemeral: formData.ephemeral,
         incremental_alive_nodes: formData.incremental_alive_nodes,
+        probe_interval: formData.probe_interval?.trim() ?? "",
         ...(formData.source_type === "remote"
-          ? { url: formData.url.trim() }
+          ? { url: formData.url.trim(), user_agent: formData.user_agent.trim() }
           : { content: formData.content }),
       };
       return updateSubscription(selectedSubscription.id, payload);
@@ -437,8 +465,9 @@ export function SubscriptionPage() {
       enabled: values.enabled,
       ephemeral: values.ephemeral,
       incremental_alive_nodes: values.incremental_alive_nodes,
+      probe_interval: values.probe_interval?.trim() ?? "",
       ...(values.source_type === "remote"
-        ? { url: values.url.trim() }
+        ? { url: values.url.trim(), user_agent: values.user_agent.trim() }
         : { content: values.content }),
     };
     await createMutation.mutateAsync(payload);
@@ -690,6 +719,13 @@ export function SubscriptionPage() {
             <Button
               variant="secondary"
               size="sm"
+              onClick={() => setBatchModalOpen(true)}
+            >
+              {t("批量导入")}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setCreateModalOpen(true)}
             >
               <Plus size={16} />
@@ -873,6 +909,33 @@ export function SubscriptionPage() {
                           <p className="field-error">{t(editForm.formState.errors.url.message)}</p>
                         ) : null}
                       </div>
+
+                      <div className="field-group field-span-2">
+                        <label className="field-label field-label-with-info" htmlFor="edit-sub-user-agent">
+                          <span>{t("User-Agent")}</span>
+                          <span
+                            className="subscription-info-icon"
+                            title={t(SUBSCRIPTION_USER_AGENT_HINT)}
+                            aria-label={t(SUBSCRIPTION_USER_AGENT_HINT)}
+                            tabIndex={0}
+                          >
+                            <Info size={13} />
+                          </span>
+                        </label>
+                        <Input
+                          id="edit-sub-user-agent"
+                          placeholder="clash.meta"
+                          invalid={Boolean(editForm.formState.errors.user_agent)}
+                          {...editForm.register("user_agent")}
+                        />
+                        {editForm.formState.errors.user_agent?.message ? (
+                          <p className="field-error">{t(editForm.formState.errors.user_agent.message)}</p>
+                        ) : null}
+                      </div>
+                      <div className="field-group">
+                        <label className="field-label" htmlFor="edit-sub-probe-interval">{t("探测间隔")}</label>
+                        <Input id="edit-sub-probe-interval" placeholder={t("留空使用全局探测间隔，例如 30s")} {...editForm.register("probe_interval")} />
+                      </div>
                     </>
                   ) : (
                     <div className="field-group field-span-2">
@@ -1010,6 +1073,56 @@ export function SubscriptionPage() {
         </div>
       ) : null}
 
+      <p className="muted">{t("健康节点订阅")}：{t("手机客户端可导入 /<代理令牌>/api/v1/healthy-subscription 。默认是 base64 URI，format=sing-box 返回 sing-box JSON。")}</p>
+
+      {batchModalOpen ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <Card className="modal-card">
+            <div className="modal-header">
+              <h3>{t("批量导入订阅")}</h3>
+              <Button variant="ghost" size="sm" onClick={() => setBatchModalOpen(false)} aria-label={t("取消")}>
+                <X size={16} />
+              </Button>
+            </div>
+            <form
+              className="form-grid"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void batchCreateSubscriptions({
+                  text: batchText,
+                  name_regex: batchNameRegex.trim() || undefined,
+                }).then(async (result) => {
+                  await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+                  setBatchModalOpen(false);
+                  setBatchText("");
+                  setBatchNameRegex("");
+                  showToast("success", t("订阅 {{name}} 创建成功", { name: String(result.created.length) }));
+                  if (result.errors.length > 0) {
+                    showToast("error", result.errors[0]?.message ?? t("未知错误"));
+                  }
+                }).catch((error: unknown) => {
+                  showToast("error", formatApiErrorMessage(error, t));
+                });
+              }}
+            >
+              <div className="field-group field-span-2">
+                <label className="field-label" htmlFor="batch-sub-text">{t("每行一个订阅链接")}</label>
+                <Textarea id="batch-sub-text" rows={8} value={batchText} onChange={(event) => setBatchText(event.target.value)} />
+              </div>
+              <div className="field-group field-span-2">
+                <label className="field-label" htmlFor="batch-sub-regex">{t("名称正则")}</label>
+                <Input id="batch-sub-regex" placeholder="https://([^./]+)" value={batchNameRegex} onChange={(event) => setBatchNameRegex(event.target.value)} />
+                <p className="muted">{t("用捕获组从链接提取名称，留空则使用域名中间段")}</p>
+              </div>
+              <div className="detail-actions" style={{ justifyContent: "flex-end" }}>
+                <Button type="submit">{t("确认创建")}</Button>
+                <Button type="button" variant="secondary" onClick={() => setBatchModalOpen(false)}>{t("取消")}</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      ) : null}
+
       {createModalOpen ? (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <Card className="modal-card">
@@ -1103,6 +1216,33 @@ export function SubscriptionPage() {
                     {createForm.formState.errors.url?.message ? (
                       <p className="field-error">{t(createForm.formState.errors.url.message)}</p>
                     ) : null}
+                  </div>
+
+                  <div className="field-group field-span-2">
+                    <label className="field-label field-label-with-info" htmlFor="create-sub-user-agent">
+                      <span>{t("User-Agent")}</span>
+                      <span
+                        className="subscription-info-icon"
+                        title={t(SUBSCRIPTION_USER_AGENT_HINT)}
+                        aria-label={t(SUBSCRIPTION_USER_AGENT_HINT)}
+                        tabIndex={0}
+                      >
+                        <Info size={13} />
+                      </span>
+                    </label>
+                    <Input
+                      id="create-sub-user-agent"
+                      placeholder="clash.meta"
+                      invalid={Boolean(createForm.formState.errors.user_agent)}
+                      {...createForm.register("user_agent")}
+                    />
+                    {createForm.formState.errors.user_agent?.message ? (
+                      <p className="field-error">{t(createForm.formState.errors.user_agent.message)}</p>
+                    ) : null}
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label" htmlFor="create-sub-probe-interval">{t("探测间隔")}</label>
+                    <Input id="create-sub-probe-interval" placeholder={t("留空使用全局探测间隔，例如 30s")} {...createForm.register("probe_interval")} />
                   </div>
                 </>
               ) : (

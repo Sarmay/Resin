@@ -103,6 +103,10 @@ export async function probeEgress(hash: string): Promise<EgressProbeResult> {
   });
 }
 
+export async function openNodeCircuit(hash: string): Promise<void> {
+  await apiRequest(`${basePath}/${hash}/actions/open-circuit`, { method: "POST" });
+}
+
 export async function probeLatency(hash: string): Promise<LatencyProbeResult> {
   return apiRequest<LatencyProbeResult>(`${basePath}/${hash}/actions/probe-latency`, {
     method: "POST",

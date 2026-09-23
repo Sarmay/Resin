@@ -101,12 +101,15 @@ var platformPatchAllowedFields = map[string]bool{
 	"reverse_proxy_fixed_account_header":   true,
 	"allocation_policy":                    true,
 	"passive_circuit_breaker_disabled":     true,
+	"ipv4_only":                            true,
 }
 
 var subscriptionPatchAllowedFields = map[string]bool{
 	"name":                       true,
 	"url":                        true,
 	"content":                    true,
+	"user_agent":                 true,
+	"probe_interval":             true,
 	"update_interval":            true,
 	"enabled":                    true,
 	"ephemeral":                  true,

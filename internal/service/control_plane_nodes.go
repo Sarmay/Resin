@@ -219,6 +219,18 @@ func (s *ControlPlaneService) GetNode(hashStr string) (*NodeSummary, error) {
 	return &ns, nil
 }
 
+// OpenNodeCircuit marks a node circuit-open immediately.
+func (s *ControlPlaneService) OpenNodeCircuit(hashStr string) error {
+	h, err := node.ParseHex(hashStr)
+	if err != nil {
+		return invalidArg("node_hash: invalid format")
+	}
+	if s.Pool == nil || !s.Pool.OpenCircuit(h) {
+		return notFound("node not found")
+	}
+	return nil
+}
+
 // ProbeEgress triggers a synchronous egress probe and returns results.
 func (s *ControlPlaneService) ProbeEgress(hashStr string) (*probe.EgressProbeResult, error) {
 	h, err := node.ParseHex(hashStr)

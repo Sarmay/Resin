@@ -33,6 +33,26 @@ func (e *NonRetryableError) Unwrap() error {
 	return e.Err
 }
 
+type downloadUserAgentContextKey struct{}
+
+// WithDownloadUserAgent returns a context that overrides the downloader's
+// default User-Agent for this request. An empty value does not override.
+func WithDownloadUserAgent(ctx context.Context, userAgent string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, downloadUserAgentContextKey{}, userAgent)
+}
+
+// DownloadUserAgentFromContext returns the per-request User-Agent override.
+func DownloadUserAgentFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	userAgent, _ := ctx.Value(downloadUserAgentContextKey{}).(string)
+	return userAgent
+}
+
 // Downloader fetches remote resources. Interface allows for proxy-aware
 // implementations in later phases.
 type Downloader interface {
@@ -78,7 +98,10 @@ func (d *DirectDownloader) Download(ctx context.Context, url string) ([]byte, er
 	if err != nil {
 		return nil, &NonRetryableError{Err: err}
 	}
-	userAgent := d.currentUserAgent()
+	userAgent := DownloadUserAgentFromContext(ctx)
+	if userAgent == "" {
+		userAgent = d.currentUserAgent()
+	}
 	if userAgent != "" {
 		req.Header.Set("User-Agent", userAgent)
 	}

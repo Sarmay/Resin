@@ -94,6 +94,23 @@ func HandleGetSubscription(cp *service.ControlPlaneService) http.HandlerFunc {
 	}
 }
 
+// HandleBatchCreateSubscriptions returns a handler for POST /api/v1/subscriptions/batch.
+func HandleBatchCreateSubscriptions(cp *service.ControlPlaneService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req service.BatchCreateSubscriptionsRequest
+		if err := DecodeBody(r, &req); err != nil {
+			writeDecodeBodyError(w, err)
+			return
+		}
+		result, err := cp.CreateSubscriptionsBatch(req)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		WriteJSON(w, http.StatusOK, result)
+	}
+}
+
 // HandleCreateSubscription returns a handler for POST /api/v1/subscriptions.
 func HandleCreateSubscription(cp *service.ControlPlaneService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -3,6 +3,7 @@ package routing
 import (
 	"errors"
 	"math/rand/v2"
+	"strings"
 	"sync"
 	"time"
 
@@ -89,6 +90,68 @@ func randomRoute(
 		selected = h1
 	}
 	return selected, nil
+}
+
+func collectRegionHashes(view platform.ReadOnlyView, pool PoolAccessor, region string) []node.Hash {
+	region = strings.ToLower(strings.TrimSpace(region))
+	if region == "" || view == nil || pool == nil {
+		return nil
+	}
+	var matches []node.Hash
+	view.Range(func(h node.Hash) bool {
+		entry, ok := pool.GetEntry(h)
+		if !ok {
+			return true
+		}
+		if strings.EqualFold(entry.GetEgressRegion(), region) {
+			matches = append(matches, h)
+		}
+		return true
+	})
+	return matches
+}
+
+func randomRouteAmong(
+	candidates []node.Hash,
+	plat *platform.Platform,
+	stats *IPLoadStats,
+	pool PoolAccessor,
+	targetDomain string,
+	authorities []string,
+	p2cWindow time.Duration,
+) (node.Hash, error) {
+	if len(candidates) == 0 {
+		return node.Zero, ErrNoAvailableNodes
+	}
+	if len(candidates) == 1 {
+		return candidates[0], nil
+	}
+
+	rng := randomRouteRNGPool.Get().(*rand.Rand)
+	defer randomRouteRNGPool.Put(rng)
+
+	h1 := candidates[rng.IntN(len(candidates))]
+	h2 := candidates[rng.IntN(len(candidates))]
+	if h2 == h1 {
+		for i := 0; i < 3; i++ {
+			candidate := candidates[rng.IntN(len(candidates))]
+			if candidate != h1 {
+				h2 = candidate
+				break
+			}
+		}
+		if h2 == h1 {
+			return h1, nil
+		}
+	}
+
+	lat1, lat2 := compareLatencies(h1, h2, pool, targetDomain, authorities, p2cWindow)
+	s1 := calculateScore(h1, lat1, plat, stats, pool)
+	s2 := calculateScore(h2, lat2, plat, stats, pool)
+	if s1 < s2 {
+		return h1, nil
+	}
+	return h2, nil
 }
 
 // compareLatencies determines the latency values for h1 and h2.

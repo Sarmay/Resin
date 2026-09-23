@@ -101,7 +101,7 @@ func TestScheduler_UpdateSubscription_DownloadViaHTTPServer(t *testing.T) {
 	const rawOutbound = `{"type":"shadowsocks","tag":"http-node","server":"1.1.1.1","server_port":443,"method":"aes-256-gcm","password":"secret"}`
 	body := makeSubscriptionJSON(rawOutbound)
 
-	subUserAgent := "resin-scheduler-e2e"
+	const subUserAgent = "FlClash/0.8.92"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if ua := r.Header.Get("User-Agent"); ua != subUserAgent {
 			t.Fatalf("user-agent: got %q, want %q", ua, subUserAgent)
@@ -111,11 +111,12 @@ func TestScheduler_UpdateSubscription_DownloadViaHTTPServer(t *testing.T) {
 	defer srv.Close()
 
 	sub := subscription.NewSubscription("s1", "TestSub", srv.URL+"/sub", true, false)
+	sub.SetUserAgent(subUserAgent)
 	subMgr.Register(sub)
 
 	downloader := netutil.NewDirectDownloader(
 		func() time.Duration { return time.Second },
-		func() string { return subUserAgent },
+		func() string { return "clash.meta" },
 	)
 	sched := NewSubscriptionScheduler(SchedulerConfig{
 		SubManager: subMgr,

@@ -15,6 +15,7 @@ type Platform struct {
 	ReverseProxyFixedAccountHeader   string `json:"reverse_proxy_fixed_account_header"`
 	AllocationPolicy                 string `json:"allocation_policy"`
 	PassiveCircuitBreakerDisabled    bool   `json:"passive_circuit_breaker_disabled"`
+	IPv4Only                         bool   `json:"ipv4_only"`
 	UpdatedAtNs                      int64  `json:"updated_at_ns"`
 }
 
@@ -25,6 +26,8 @@ type Subscription struct {
 	SourceType                string `json:"source_type"`
 	URL                       string `json:"url"`
 	Content                   string `json:"content"`
+	UserAgent                 string `json:"user_agent"`
+	ProbeIntervalNs           int64  `json:"probe_interval_ns"`
 	UpdateIntervalNs          int64  `json:"update_interval_ns"`
 	Enabled                   bool   `json:"enabled"`
 	Ephemeral                 bool   `json:"ephemeral"`

@@ -517,6 +517,35 @@ func (p *GlobalNodePool) RangeNodes(fn func(node.Hash, *node.NodeEntry) bool) {
 	p.nodes.Range(fn)
 }
 
+// OpenCircuit marks a node as circuit-open immediately.
+// It is used when an operator or calling service reports that the exit is unusable
+// even though connectivity probes still succeed.
+func (p *GlobalNodePool) OpenCircuit(hash node.Hash) bool {
+	entry, ok := p.nodes.Load(hash)
+	if !ok {
+		return false
+	}
+
+	changed := false
+	if entry.CircuitOpenSince.CompareAndSwap(0, time.Now().UnixNano()) {
+		changed = true
+	}
+	if maxFailures := p.currentMaxConsecutiveFailures(); maxFailures > 0 {
+		if entry.FailureCount.Load() < int32(maxFailures) {
+			entry.FailureCount.Store(int32(maxFailures))
+			changed = true
+		}
+	}
+	if !changed {
+		return true
+	}
+	p.notifyAllPlatformsDirty(hash)
+	if p.onNodeDynamicChanged != nil {
+		p.onNodeDynamicChanged(hash)
+	}
+	return true
+}
+
 // RecordResult records a probe or passive health-check result.
 // On success, resets FailureCount and clears circuit-breaker.
 // On failure, increments FailureCount and opens circuit-breaker if threshold is reached.

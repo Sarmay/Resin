@@ -27,6 +27,8 @@ type SubscriptionResponse struct {
 	SourceType              string `json:"source_type"`
 	URL                     string `json:"url"`
 	Content                 string `json:"content"`
+	UserAgent               string `json:"user_agent"`
+	ProbeInterval           string `json:"probe_interval,omitempty"`
 	UpdateInterval          string `json:"update_interval"`
 	NodeCount               int    `json:"node_count"`
 	HealthyNodeCount        int    `json:"healthy_node_count"`
@@ -69,6 +71,8 @@ func (s *ControlPlaneService) subToResponse(sub *subscription.Subscription) Subs
 		SourceType:              sub.SourceType(),
 		URL:                     sub.URL(),
 		Content:                 sub.Content(),
+		UserAgent:               sub.UserAgent(),
+		ProbeInterval:           formatProbeInterval(sub.ProbeIntervalNs()),
 		UpdateInterval:          time.Duration(sub.UpdateIntervalNs()).String(),
 		NodeCount:               nodeCount,
 		HealthyNodeCount:        healthyNodeCount,
@@ -120,6 +124,8 @@ type CreateSubscriptionRequest struct {
 	SourceType              *string `json:"source_type"`
 	URL                     *string `json:"url"`
 	Content                 *string `json:"content"`
+	UserAgent               *string `json:"user_agent"`
+	ProbeInterval           *string `json:"probe_interval"`
 	UpdateInterval          *string `json:"update_interval"`
 	Enabled                 *bool   `json:"enabled"`
 	Ephemeral               *bool   `json:"ephemeral"`
@@ -129,6 +135,46 @@ type CreateSubscriptionRequest struct {
 
 const minSubscriptionUpdateInterval = 30 * time.Second
 const defaultSubscriptionEphemeralNodeEvictDelay = 72 * time.Hour
+const maxSubscriptionUserAgentLength = 256
+const minSubscriptionProbeInterval = 10 * time.Second
+
+func formatProbeInterval(ns int64) string {
+	if ns <= 0 {
+		return ""
+	}
+	return time.Duration(ns).String()
+}
+
+func parseProbeInterval(raw string) (time.Duration, *ServiceError) {
+	value := strings.TrimSpace(raw)
+	if value == "" || value == "0" || value == "0s" {
+		return 0, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, invalidArg("probe_interval: " + err.Error())
+	}
+	if parsed < minSubscriptionProbeInterval {
+		return 0, invalidArg("probe_interval: must be empty or >= 10s")
+	}
+	return parsed, nil
+}
+
+func normalizeSubscriptionUserAgent(raw string) (string, *ServiceError) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", nil
+	}
+	if len(value) > maxSubscriptionUserAgentLength {
+		return "", invalidArg("user_agent: must be at most 256 characters")
+	}
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			return "", invalidArg("user_agent: contains invalid characters")
+		}
+	}
+	return value, nil
+}
 
 func parseSubscriptionSourceType(raw *string) (string, *ServiceError) {
 	if raw == nil {
@@ -155,6 +201,24 @@ func (s *ControlPlaneService) CreateSubscription(req CreateSubscriptionRequest) 
 		return nil, verr
 	}
 
+	probeInterval := time.Duration(0)
+	if req.ProbeInterval != nil {
+		parsed, verr := parseProbeInterval(*req.ProbeInterval)
+		if verr != nil {
+			return nil, verr
+		}
+		probeInterval = parsed
+	}
+
+	userAgent := ""
+	if req.UserAgent != nil {
+		normalized, verr := normalizeSubscriptionUserAgent(*req.UserAgent)
+		if verr != nil {
+			return nil, verr
+		}
+		userAgent = normalized
+	}
+
 	subURL := ""
 	content := ""
 	switch sourceType {
@@ -176,6 +240,9 @@ func (s *ControlPlaneService) CreateSubscription(req CreateSubscriptionRequest) 
 		content = *req.Content
 		if req.URL != nil && strings.TrimSpace(*req.URL) != "" {
 			return nil, invalidArg("url is not allowed for local subscription")
+		}
+		if userAgent != "" {
+			return nil, invalidArg("user_agent is not allowed for local subscription")
 		}
 	default:
 		return nil, invalidArg("source_type: must be remote or local")
@@ -226,6 +293,8 @@ func (s *ControlPlaneService) CreateSubscription(req CreateSubscriptionRequest) 
 		SourceType:                sourceType,
 		URL:                       subURL,
 		Content:                   content,
+		UserAgent:                 userAgent,
+		ProbeIntervalNs:           int64(probeInterval),
 		UpdateIntervalNs:          int64(updateInterval),
 		Enabled:                   enabled,
 		Ephemeral:                 ephemeral,
@@ -242,6 +311,8 @@ func (s *ControlPlaneService) CreateSubscription(req CreateSubscriptionRequest) 
 	sub.SetFetchConfig(subURL, int64(updateInterval))
 	sub.SetSourceType(sourceType)
 	sub.SetContent(content)
+	sub.SetUserAgent(userAgent)
+	sub.SetProbeIntervalNs(int64(probeInterval))
 	sub.SetIncrementalAliveNodes(incrementalAliveNodes)
 	sub.SetEphemeralNodeEvictDelayNs(int64(ephemeralNodeEvictDelay))
 	sub.CreatedAtNs = now
@@ -276,6 +347,7 @@ func (s *ControlPlaneService) UpdateSubscription(id string, patchJSON json.RawMe
 	enabledChanged := false
 	urlChanged := false
 	contentChanged := false
+	userAgentChanged := false
 	sourceType := sub.SourceType()
 
 	newName := sub.Name()
@@ -301,6 +373,34 @@ func (s *ControlPlaneService) UpdateSubscription(id string, patchJSON json.RawMe
 		newURL = urlStr
 		if newURL != sub.URL() {
 			urlChanged = true
+		}
+	}
+
+	newProbeInterval := sub.ProbeIntervalNs()
+	if probeInterval, ok, err := patch.optionalString("probe_interval"); err != nil {
+		return nil, err
+	} else if ok {
+		parsed, verr := parseProbeInterval(probeInterval)
+		if verr != nil {
+			return nil, verr
+		}
+		newProbeInterval = int64(parsed)
+	}
+
+	newUserAgent := sub.UserAgent()
+	if userAgent, ok, err := patch.optionalString("user_agent"); err != nil {
+		return nil, err
+	} else if ok {
+		if sourceType != subscription.SourceTypeRemote {
+			return nil, invalidArg("user_agent: field is not allowed for local subscription")
+		}
+		normalized, verr := normalizeSubscriptionUserAgent(userAgent)
+		if verr != nil {
+			return nil, verr
+		}
+		newUserAgent = normalized
+		if newUserAgent != sub.UserAgent() {
+			userAgentChanged = true
 		}
 	}
 
@@ -371,6 +471,8 @@ func (s *ControlPlaneService) UpdateSubscription(id string, patchJSON json.RawMe
 		SourceType:                sourceType,
 		URL:                       newURL,
 		Content:                   newContent,
+		UserAgent:                 newUserAgent,
+		ProbeIntervalNs:           newProbeInterval,
 		UpdateIntervalNs:          newInterval,
 		Enabled:                   newEnabled,
 		Ephemeral:                 newEphemeral,
@@ -386,6 +488,8 @@ func (s *ControlPlaneService) UpdateSubscription(id string, patchJSON json.RawMe
 	// Apply side-effects via scheduler.
 	sub.SetFetchConfig(newURL, newInterval)
 	sub.SetContent(newContent)
+	sub.SetUserAgent(newUserAgent)
+	sub.SetProbeIntervalNs(newProbeInterval)
 	sub.SetEphemeral(newEphemeral)
 	sub.SetIncrementalAliveNodes(newIncrementalAliveNodes)
 	sub.SetEphemeralNodeEvictDelayNs(newEphemeralNodeEvictDelay)
@@ -397,7 +501,7 @@ func (s *ControlPlaneService) UpdateSubscription(id string, patchJSON json.RawMe
 	if enabledChanged {
 		s.Scheduler.SetSubscriptionEnabled(sub, newEnabled)
 	}
-	if urlChanged || contentChanged {
+	if urlChanged || contentChanged || userAgentChanged {
 		go s.Scheduler.UpdateSubscription(sub)
 	}
 

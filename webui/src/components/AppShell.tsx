@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Cable,
   Database,
+  Github,
   LayoutDashboard,
   LogOut,
   Logs,
@@ -139,6 +140,16 @@ export function AppShell() {
           {!token ? <p className="sidebar-hint">{t("当前为免认证访问模式")}</p> : null}
 
           <div className="sidebar-tools">
+            <a
+              className="btn btn-secondary btn-sm sidebar-icon-btn"
+              href="https://github.com/Sarmay/Resin"
+              target="_blank"
+              rel="noreferrer"
+              aria-label={t("打开 Git 仓库")}
+              title={t("打开 Git 仓库")}
+            >
+              <Github size={16} />
+            </a>
             {token ? (
               <Button
                 variant="secondary"

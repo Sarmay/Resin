@@ -8,9 +8,11 @@ import type {
 
 const basePath = "/api/v1/subscriptions";
 
-type ApiSubscription = Omit<Subscription, "last_checked" | "last_updated" | "last_error"> & {
+type ApiSubscription = Omit<Subscription, "last_checked" | "last_updated" | "last_error" | "user_agent"> & {
   source_type?: "remote" | "local";
   content?: string;
+  user_agent?: string | null;
+  probe_interval?: string | null;
   last_checked?: string | null;
   last_updated?: string | null;
   last_error?: string | null;
@@ -21,6 +23,8 @@ function normalizeSubscription(raw: ApiSubscription): Subscription {
     ...raw,
     source_type: raw.source_type ?? "remote",
     content: raw.content ?? "",
+    user_agent: raw.user_agent ?? "",
+    probe_interval: raw.probe_interval ?? "",
     last_checked: raw.last_checked || "",
     last_updated: raw.last_updated || "",
     last_error: raw.last_error || "",
@@ -59,6 +63,23 @@ export async function listSubscriptions(input: ListSubscriptionsInput = {}): Pro
 
   const data = await apiRequest<PageResponse<ApiSubscription>>(`${basePath}?${query.toString()}`);
   return normalizeSubscriptionPage(data);
+}
+
+export async function batchCreateSubscriptions(input: {
+  text: string;
+  name_regex?: string;
+  update_interval?: string;
+  user_agent?: string;
+  probe_interval?: string;
+}): Promise<{ created: Subscription[]; errors: { line: number; url: string; message: string }[] }> {
+  const data = await apiRequest<{ created: ApiSubscription[]; errors: { line: number; url: string; message: string }[] }>(
+    `${basePath}/batch`,
+    { method: "POST", body: input },
+  );
+  return {
+    created: (data.created ?? []).map(normalizeSubscription),
+    errors: data.errors ?? [],
+  };
 }
 
 export async function createSubscription(input: SubscriptionCreateInput): Promise<Subscription> {

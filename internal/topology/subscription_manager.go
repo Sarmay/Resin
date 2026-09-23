@@ -1,8 +1,10 @@
 package topology
 
 import (
-	"github.com/puzpuzpuz/xsync/v4"
+	"time"
+
 	"github.com/Resinat/Resin/internal/subscription"
+	"github.com/puzpuzpuz/xsync/v4"
 )
 
 // SubscriptionManager holds all subscription instances and provides
@@ -47,4 +49,28 @@ func (m *SubscriptionManager) Range(fn func(id string, sub *subscription.Subscri
 // Size returns the number of subscriptions.
 func (m *SubscriptionManager) Size() int {
 	return m.subs.Size()
+}
+
+// MinProbeInterval returns the shortest positive probe interval among the
+// given enabled subscriptions. Zero means every subscription inherits the
+// global interval.
+func (m *SubscriptionManager) MinProbeInterval(subscriptionIDs []string) time.Duration {
+	if m == nil {
+		return 0
+	}
+	var min time.Duration
+	for _, id := range subscriptionIDs {
+		sub := m.Lookup(id)
+		if sub == nil || !sub.Enabled() {
+			continue
+		}
+		interval := time.Duration(sub.ProbeIntervalNs())
+		if interval <= 0 {
+			continue
+		}
+		if min == 0 || interval < min {
+			min = interval
+		}
+	}
+	return min
 }

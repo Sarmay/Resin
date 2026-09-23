@@ -18,7 +18,7 @@ import { formatDateTime, formatRelativeTime } from "../../lib/time";
 import { listPlatforms } from "../platforms/api";
 import type { Platform } from "../platforms/types";
 import { listSubscriptions } from "../subscriptions/api";
-import { getNode, listNodes, probeEgress, probeLatency } from "./api";
+import { getNode, listNodes, openNodeCircuit, probeEgress, probeLatency } from "./api";
 import type { NodeSummary } from "./types";
 import { getAllRegions, getRegionName } from "./regions";
 import type { NodeListFilters, NodeSortBy, SortOrder } from "./types";
@@ -978,6 +978,30 @@ export function NodesPage() {
                       disabled={isProbePending(detailNode.node_hash, "egress")}
                     >
                       {isProbePending(detailNode.node_hash, "egress") ? t("探测中...") : t("触发出口探测")}
+                    </Button>
+                  </div>
+                  <div className="platform-op-item">
+                    <div className="platform-op-copy">
+                      <h5>{t("打开熔断")}</h5>
+                      <p className="platform-op-hint">{t("立即把这个节点标为熔断，不再分配。")}</p>
+                    </div>
+                    <Button
+                      variant="danger"
+                      onClick={() => {
+                        if (!window.confirm(t("确认把节点标为熔断？"))) {
+                          return;
+                        }
+                        void openNodeCircuit(detailNode.node_hash)
+                          .then(async () => {
+                            await refreshNodes();
+                            showToast("success", t("节点已熔断"));
+                          })
+                          .catch((error: unknown) => {
+                            showToast("error", formatApiErrorMessage(error, t));
+                          });
+                      }}
+                    >
+                      {t("打开熔断")}
                     </Button>
                   </div>
                   <div className="platform-op-item">

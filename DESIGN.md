@@ -1380,6 +1380,7 @@ API 阻塞到重建完成为止。
   "source_type": "remote",
   "url": "https://example.com/sub",
   "content": "",
+  "user_agent": "",
   "update_interval": "5m",
   "node_count": 1200,
   "healthy_node_count": 980,
@@ -1394,8 +1395,8 @@ API 阻塞到重建完成为止。
 ```
 
 `healthy_node_count` 规则：节点 `Outbound` 非空且节点未熔断。
-* `source_type=remote`：`url` 非空，`content` 为空字符串。
-* `source_type=local`：`content` 非空，`url` 为空字符串。
+* `source_type=remote`：`url` 非空，`content` 为空字符串。`user_agent` 为空时，拉取订阅使用默认 User-Agent `clash.meta`。
+* `source_type=local`：`content` 非空，`url` 为空字符串，`user_agent` 为空字符串。
 
 #### 列出订阅
 
@@ -1414,6 +1415,7 @@ Body：
   "name": "sub-A",
   "source_type": "remote",
   "url": "https://example.com/sub",
+  "user_agent": "FlClash/0.8.92",
   "update_interval": "5m",
   "enabled": true,
   "ephemeral": false,
@@ -1432,7 +1434,7 @@ Body：
 字段要求：
 
 * 必填字段：`name`，以及按 `source_type` 决定的源字段（`remote` 需要 `url`，`local` 需要 `content`）。
-* 可选字段：`source_type`、`url`、`content`、`update_interval`、`enabled`、`ephemeral`、`ephemeral_node_evict_delay`
+* 可选字段：`source_type`、`url`、`content`、`user_agent`、`update_interval`、`enabled`、`ephemeral`、`ephemeral_node_evict_delay`
 * 不可传字段：`id`、`node_count`、`healthy_node_count`、`created_at`、`last_checked`、`last_updated`、`last_error`
 * 默认值：`update_interval="5m"`、`enabled=true`、`ephemeral=false`、`ephemeral_node_evict_delay="72h"`
 
@@ -1441,7 +1443,8 @@ Body：
 * `name`：trim 后非空。
 * `source_type`：枚举 `remote|local`，默认 `remote`。
 * `source_type=remote`：`url` 必填，且必须是 `http/https` 绝对 URL；`content` 不允许传非空值。
-* `source_type=local`：`content` 必填且 trim 后非空；`url` 不允许传非空值。
+* `source_type=local`：`content` 必填且 trim 后非空；`url` 不允许传非空值；`user_agent` 不允许传非空值。
+* `user_agent`：可选。trim 后为空表示使用默认值 `clash.meta`。非空时最长 256 个字符，且不能包含控制字符。仅 `source_type=remote` 可用。修改后会立即重新拉取订阅。
 * `update_interval`：合法 Go duration，且 `>=30s`。
 * `ephemeral_node_evict_delay`：合法 Go duration，且 `>=0s`。
 
@@ -1471,7 +1474,7 @@ Body（partial patch 示例）：
 字段要求：
 
 * 必填字段：无
-* 可改字段：`name`、`url`、`content`、`update_interval`、`enabled`、`ephemeral`、`ephemeral_node_evict_delay`
+* 可改字段：`name`、`url`、`content`、`user_agent`、`update_interval`、`enabled`、`ephemeral`、`ephemeral_node_evict_delay`
 * 不可改字段：`id`、`source_type`、`node_count`、`healthy_node_count`、`created_at`、`last_checked`、`last_updated`、`last_error`
 
 关键校验：与“创建订阅”一致。
@@ -2385,7 +2388,7 @@ Resin 支持通过 API (`PATCH /system/config`) 动态调整大部分全局运�
 以下所有配置项支持热更新。
 
 #### 基础设置
-资源下载（订阅/GeoIP）HTTP 请求固定携带 User-Agent。默认值为 `clash.meta`。
+资源下载（订阅/GeoIP）HTTP 请求默认携带 User-Agent `clash.meta`。远程订阅可以单独设置 `user_agent`；留空时仍使用这个默认值。直接下载失败后的代理重试会携带同一个 User-Agent。
 
 不使用 `sing-box` 作为默认 User-Agent 的原因是：sing-box 版本更新较快，部分订阅源返回的 sing-box 专用订阅格式并不一定兼容最新版 sing-box，使用 `clash.meta` 作为默认值更稳定。
 

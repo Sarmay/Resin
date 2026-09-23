@@ -6,59 +6,72 @@ type RequireAuthProps = {
   children: ReactElement;
 };
 
+type Gate = {
+  token: string;
+  phase: "checking" | "allowed" | "denied";
+};
+
 export function RequireAuth({ children }: RequireAuthProps) {
   const token = useAuthStore((state) => state.token);
+  const clearToken = useAuthStore((state) => state.clearToken);
   const location = useLocation();
-  const [checked, setChecked] = useState(Boolean(token));
-  const [anonymousAllowed, setAnonymousAllowed] = useState(false);
+  const [gate, setGate] = useState<Gate>({ token, phase: "checking" });
+
+  if (gate.token !== token) {
+    setGate({ token, phase: "checking" });
+  }
 
   useEffect(() => {
-    if (token) {
-      setAnonymousAllowed(false);
-      setChecked(true);
-      return;
-    }
-
     let active = true;
     const controller = new AbortController();
+    const probeToken = token;
 
-    const checkAuthMode = async () => {
+    const checkSession = async () => {
       try {
+        const headers = new Headers();
+        if (probeToken) {
+          headers.set("Authorization", `Bearer ${probeToken}`);
+        }
         const response = await fetch("/api/v1/system/info", {
           method: "GET",
+          headers,
           signal: controller.signal,
         });
         if (!active) {
           return;
         }
-        // /api/v1/system/info returns 200 only when admin auth is disabled.
-        setAnonymousAllowed(response.ok);
+        if (response.ok) {
+          setGate({ token: probeToken, phase: "allowed" });
+          return;
+        }
+        if (response.status === 401 && probeToken) {
+          clearToken();
+          return;
+        }
+        setGate({ token: probeToken, phase: "denied" });
       } catch {
         if (!active) {
           return;
         }
-        setAnonymousAllowed(false);
-      } finally {
-        if (active) {
-          setChecked(true);
-        }
+        // A transport failure is not proof the stored token was revoked.
+        setGate({ token: probeToken, phase: probeToken ? "allowed" : "denied" });
       }
     };
 
-    void checkAuthMode();
+    void checkSession();
 
     return () => {
       active = false;
       controller.abort();
     };
-  }, [token]);
+  }, [token, clearToken]);
 
-  if (token || anonymousAllowed) {
-    return children;
+  if (gate.token !== token || gate.phase === "checking") {
+    return null;
   }
 
-  if (!checked) {
-    return null;
+  if (gate.phase === "allowed") {
+    return children;
   }
 
   const next = `${location.pathname}${location.search}`;

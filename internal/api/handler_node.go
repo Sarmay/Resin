@@ -186,6 +186,32 @@ func HandleGetNode(cp *service.ControlPlaneService) http.HandlerFunc {
 	}
 }
 
+// HandleOpenNodeCircuit returns a handler for POST /api/v1/nodes/{hash}/actions/open-circuit.
+func HandleOpenNodeCircuit(cp *service.ControlPlaneService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		hash := PathParam(r, "hash")
+		if err := cp.OpenNodeCircuit(hash); err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+// HandleHealthySubscription returns a handler for GET /api/v1/healthy-subscription.
+func HandleHealthySubscription(cp *service.ControlPlaneService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, contentType, err := cp.RenderHealthySubscription(r.URL.Query().Get("format"))
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
+	}
+}
+
 // HandleProbeEgress returns a handler for POST /api/v1/nodes/{hash}/actions/probe-egress.
 func HandleProbeEgress(cp *service.ControlPlaneService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

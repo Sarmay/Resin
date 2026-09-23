@@ -229,7 +229,13 @@ func (r *Router) createOrAbortStickyLease(
 	hadPreviousLease bool,
 	invalidation leaseInvalidationReason,
 ) (Lease, xsync.ComputeOp, RouteResult, error) {
-	newLease, createdResult, err := r.createLease(plat, state, targetDomain, now, nowNs)
+	preferredRegion := ""
+	if hadPreviousLease {
+		if entry, ok := r.pool.GetEntry(previous.NodeHash); ok {
+			preferredRegion = entry.GetEgressRegion()
+		}
+	}
+	newLease, createdResult, err := r.createLease(plat, state, targetDomain, now, nowNs, preferredRegion)
 	if err != nil {
 		r.cleanupPreviousLease(state, previous, hadPreviousLease, invalidation, plat.ID, account)
 		lease, op := abortLeaseCreate(previous, hadPreviousLease)
@@ -317,8 +323,9 @@ func (r *Router) createLease(
 	targetDomain string,
 	now time.Time,
 	nowNs int64,
+	preferredRegion string,
 ) (Lease, RouteResult, error) {
-	h, entry, err := r.selectLiveRandomRoute(plat, state.IPLoadStats, targetDomain)
+	h, entry, err := r.selectLiveRoute(plat, state.IPLoadStats, targetDomain, preferredRegion)
 	if err != nil {
 		return Lease{}, RouteResult{}, err
 	}
@@ -386,6 +393,23 @@ func (r *Router) emitLeaseEvent(event LeaseEvent) {
 	if r.onLeaseEvent != nil {
 		r.onLeaseEvent(event)
 	}
+}
+
+func (r *Router) selectLiveRoute(
+	plat *platform.Platform,
+	stats *IPLoadStats,
+	targetDomain string,
+	preferredRegion string,
+) (node.Hash, *node.NodeEntry, error) {
+	if candidates := collectRegionHashes(plat.View(), r.pool, preferredRegion); len(candidates) > 0 {
+		h, err := randomRouteAmong(candidates, plat, stats, r.pool, targetDomain, r.authorities(), r.p2cWindow())
+		if err == nil {
+			if entry, ok := r.pool.GetEntry(h); ok {
+				return h, entry, nil
+			}
+		}
+	}
+	return r.selectLiveRandomRoute(plat, stats, targetDomain)
 }
 
 func (r *Router) selectLiveRandomRoute(

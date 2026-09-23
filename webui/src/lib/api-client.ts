@@ -1,4 +1,5 @@
-import { getStoredAuthToken } from "../features/auth/auth-store";
+import { getStoredAuthToken, useAuthStore } from "../features/auth/auth-store";
+import { shouldClearAdminSession } from "./admin-session";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 
@@ -79,6 +80,16 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const parsed = await parseErrorBody(response);
     const code = parsed?.error?.code ?? "HTTP_ERROR";
     const message = parsed?.error?.message ?? response.statusText;
+    if (
+      shouldClearAdminSession({
+        status: response.status,
+        auth,
+        requestToken: token,
+        storedToken: getStoredAuthToken(),
+      })
+    ) {
+      useAuthStore.getState().clearToken();
+    }
     throw new ApiError(response.status, code, message, parsed);
   }
 
