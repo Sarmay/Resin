@@ -1195,6 +1195,7 @@ Body（partial patch 示例）：
   "reverse_proxy_fixed_account_header": "Authorization\nX-Account-Id",
   "allocation_policy": "BALANCED|PREFER_LOW_LATENCY|PREFER_IDLE_IP",
   "passive_circuit_breaker_disabled": false,
+  "ipv4_only": false,
   "updated_at": "2026-02-10T12:34:56Z"
 }
 ```
@@ -1222,14 +1223,15 @@ Body：
   "reverse_proxy_empty_account_behavior": "ACCOUNT_HEADER_RULE",
   "reverse_proxy_fixed_account_header": "Authorization\nX-Account-Id",
   "allocation_policy": "BALANCED",
-  "passive_circuit_breaker_disabled": false
+  "passive_circuit_breaker_disabled": false,
+  "ipv4_only": false
 }
 ```
 
 字段要求：
 
 * 必填字段：`name`
-* 可选字段：`sticky_ttl`、`regex_filters`、`region_filters`、`reverse_proxy_miss_action`、`reverse_proxy_empty_account_behavior`、`reverse_proxy_fixed_account_header`、`allocation_policy`、`passive_circuit_breaker_disabled`
+* 可选字段：`sticky_ttl`、`regex_filters`、`region_filters`、`reverse_proxy_miss_action`、`reverse_proxy_empty_account_behavior`、`reverse_proxy_fixed_account_header`、`allocation_policy`、`passive_circuit_breaker_disabled`、`ipv4_only`
 * 不可传字段：`id`、`updated_at`、`routable_node_count`
 * 省略可选字段时，平台策略字段使用当前环境变量默认平台设置（`RESIN_DEFAULT_PLATFORM_*`）对应值；`passive_circuit_breaker_disabled` 默认 `false`
 
@@ -1241,6 +1243,8 @@ Body：
 * `region_filters`：每项为 ISO 3166-1 alpha-2 小写代码。
 * 枚举字段：`reverse_proxy_miss_action` 仅 `TREAT_AS_EMPTY|REJECT`；`reverse_proxy_empty_account_behavior` 仅 `RANDOM|FIXED_HEADER|ACCOUNT_HEADER_RULE`；`allocation_policy` 仅 `BALANCED|PREFER_LOW_LATENCY|PREFER_IDLE_IP`。
 * `passive_circuit_breaker_disabled`：布尔值。设为 `true` 后，此 Platform 的用户代理请求失败不会增加节点熔断计数；主动探测不受影响。成功请求仍会清除节点连续失败计数并可恢复熔断节点。
+* `ipv4_only`：布尔值，默认 `false`。设为 `true` 后，出口 IP 或服务器地址为 IPv6、或 `domain_strategy=ipv6_only` 的节点不进入该平台的可路由视图。
+* 租约节点失效后重新分配时，优先选择与上一出口相同国家的可路由节点；没有同国家节点时再按当前分配策略选择。
 * 组合约束：当 `reverse_proxy_empty_account_behavior=FIXED_HEADER` 时，`reverse_proxy_fixed_account_header` 必填；其值支持多行，每行一个合法 HTTP Header 字段名（会按顺序尝试提取）。
 
 错误码映射（最小集）：
@@ -1381,6 +1385,7 @@ API 阻塞到重建完成为止。
   "url": "https://example.com/sub",
   "content": "",
   "user_agent": "",
+  "probe_interval": "",
   "update_interval": "5m",
   "node_count": 1200,
   "healthy_node_count": 980,
@@ -1434,7 +1439,7 @@ Body：
 字段要求：
 
 * 必填字段：`name`，以及按 `source_type` 决定的源字段（`remote` 需要 `url`，`local` 需要 `content`）。
-* 可选字段：`source_type`、`url`、`content`、`user_agent`、`update_interval`、`enabled`、`ephemeral`、`ephemeral_node_evict_delay`
+* 可选字段：`source_type`、`url`、`content`、`user_agent`、`probe_interval`、`update_interval`、`enabled`、`ephemeral`、`ephemeral_node_evict_delay`
 * 不可传字段：`id`、`node_count`、`healthy_node_count`、`created_at`、`last_checked`、`last_updated`、`last_error`
 * 默认值：`update_interval="5m"`、`enabled=true`、`ephemeral=false`、`ephemeral_node_evict_delay="72h"`
 
@@ -1445,6 +1450,7 @@ Body：
 * `source_type=remote`：`url` 必填，且必须是 `http/https` 绝对 URL；`content` 不允许传非空值。
 * `source_type=local`：`content` 必填且 trim 后非空；`url` 不允许传非空值；`user_agent` 不允许传非空值。
 * `user_agent`：可选。trim 后为空表示使用默认值 `clash.meta`。非空时最长 256 个字符，且不能包含控制字符。仅 `source_type=remote` 可用。修改后会立即重新拉取订阅。
+* `probe_interval`：可选。空、`0` 或 `0s` 表示使用全局探测间隔。非空时为合法 Go duration，且 `>=10s`。同一节点属于多个订阅时，使用其中最短的正间隔。
 * `update_interval`：合法 Go duration，且 `>=30s`。
 * `ephemeral_node_evict_delay`：合法 Go duration，且 `>=0s`。
 
@@ -1474,7 +1480,7 @@ Body（partial patch 示例）：
 字段要求：
 
 * 必填字段：无
-* 可改字段：`name`、`url`、`content`、`user_agent`、`update_interval`、`enabled`、`ephemeral`、`ephemeral_node_evict_delay`
+* 可改字段：`name`、`url`、`content`、`user_agent`、`probe_interval`、`update_interval`、`enabled`、`ephemeral`、`ephemeral_node_evict_delay`
 * 不可改字段：`id`、`source_type`、`node_count`、`healthy_node_count`、`created_at`、`last_checked`、`last_updated`、`last_error`
 
 关键校验：与“创建订阅”一致。
@@ -1491,6 +1497,42 @@ Body（partial patch 示例）：
 **DELETE** `/subscriptions/{subscription_id}`
 
 请求体：无。
+
+#### 批量导入订阅
+
+**POST** `/subscriptions/batch`
+
+```json
+{
+  "text": "https://example.com/a\nhttps://example.com/b",
+  "name_regex": "https://([^./]+)",
+  "update_interval": "12h",
+  "user_agent": "clash.meta",
+  "probe_interval": "30s"
+}
+```
+
+`text` 按行拆分。空行和 `#` 开头的行忽略。未提供 `name_regex` 时，名称取主机名倒数第二段；重名自动追加 `-2`、`-3`。正则有捕获组时使用第一组，否则使用整段匹配。单行失败记入 `errors`，不影响其他行。接口返回后由调度器异步拉取，不在请求内阻塞刷新。
+
+#### 健康节点订阅
+
+**GET** `/healthy-subscription?format=uri|sing-box`
+
+管理 API 使用管理员令牌。给手机或客户端导入时使用代理令牌路径：
+
+`GET /{proxy_token}/api/v1/healthy-subscription?format=uri|sing-box`
+
+`format` 默认 `uri`，响应为 base64 编码的代理 URI 列表。`sing-box` 返回 `{"outbounds":[...]}`。只包含当前健康且已有出口 IP 的节点。
+
+#### 立即熔断节点
+
+**POST** `/nodes/{hash}/actions/open-circuit`
+
+也可使用代理令牌：
+
+`POST /{proxy_token}/api/v1/nodes/{hash}/actions/open-circuit`
+
+立即把节点标为熔断，使其离开可路由视图。返回 `{ "status": "ok" }`。
 
 错误码映射（最小集）：
 
@@ -1918,6 +1960,12 @@ Query（建议）：
 * `fuzzy`: 是否启用模糊匹配，可选，`true`/`false`
 
 `fuzzy=true` 时，`platform_id`、`platform_name`、`account`、`target_host` 使用不区分大小写的子串匹配；不传或 `false` 时为精确匹配。
+
+#### 清除日志
+
+**DELETE** `/request-logs`
+
+丢弃内存队列中尚未落盘的记录，并删除所有请求日志分片中的已存记录。返回 `{ "status": "ok" }`。
 
 返回结果按照时间倒序排序。返回摘要（不含 payload）：
 

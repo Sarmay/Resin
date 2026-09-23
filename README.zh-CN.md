@@ -61,6 +61,10 @@
 - 纯 HTTP 代理行：`IP:PORT` 或 `IP:PORT:USER:PASS`（支持 IPv4 和 IPv6）。
 - Base64 包裹的文本订阅（例如 URI 行或纯文本节点列表）。
 
+远程订阅可以单独填写 User-Agent，留空时使用 `clash.meta`。探测间隔留空时使用全局设置；填写后只作用于该订阅的节点，最短 10 秒。订阅管理支持按行批量导入链接，名称默认取域名中间段，也可以用正则捕获组命名。
+
+管理后台提供在线文档：登录后打开 `/ui/docs`。
+
 ### 支持的出站节点协议类型
 
 - 对于 sing-box JSON/原始 outbounds：`socks`、`http`、`shadowsocks`、`vmess`、`trojan`、`wireguard`、`hysteria`、`vless`、`shadowtls`、`tuic`、`hysteria2`、`anytls`、`ssh`。
@@ -93,7 +97,7 @@ services:
       - ./data/state:/var/lib/resin
       - ./data/log:/var/log/resin
 ```
-运行 `docker compose up -d` 启动服务。
+运行 `docker compose up -d --build` 启动服务。本地构建未设置 `RESIN_VERSION` 时，界面版本来自仓库根目录的 `VERSION` 文件，当前为 `v1.3.0`。需要覆盖时再设置 `RESIN_VERSION`。
 
 自定义接入点端口还必须能从容器外访问。Docker 无法为已运行容器动态增加端口映射，因此请在 `ports` 中提前映射所需端口范围（例如 `"2300-2399:2300-2399"`），或在适合的环境中使用 host 网络。
 

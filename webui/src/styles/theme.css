@@ -67,6 +67,107 @@ a {
   width: 100%;
 }
 
+.docs-page,
+.docs-layout,
+.docs-article,
+.docs-section {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.docs-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.docs-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.docs-toc a {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.docs-toc a:hover {
+  color: var(--text);
+}
+
+.docs-article {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.docs-section {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+}
+
+.docs-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.docs-section p,
+.docs-section li {
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.docs-section p + p,
+.docs-section ul,
+.docs-section pre {
+  margin-top: 0.75rem;
+}
+
+.docs-section ul {
+  padding-left: 1.2rem;
+}
+
+.docs-section pre {
+  overflow: auto;
+  padding: 0.8rem 0.9rem;
+  border-radius: 8px;
+  background: #f4f7fb;
+  border: 1px solid var(--border);
+}
+
+.docs-section code {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.86rem;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .docs-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .docs-toc {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    max-width: 100%;
+    gap: 0.8rem;
+    padding-bottom: 0.2rem;
+  }
+
+  .docs-toc a {
+    white-space: nowrap;
+  }
+}
+
 .spin {
   animation: spin 1s linear infinite;
 }

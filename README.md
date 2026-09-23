@@ -61,6 +61,10 @@ It helps shield your services from unstable underlying proxy nodes by aggregatin
 - Plain HTTP proxy lines: `IP:PORT` or `IP:PORT:USER:PASS` (IPv4 and IPv6).
 - Base64-wrapped text subscriptions (for URI lines/plain-text node lists).
 
+A remote subscription can set its own User-Agent. Blank uses `clash.meta`. A blank probe interval uses the global setting; a custom interval applies to that subscription's nodes and must be at least 10 seconds. Subscriptions can be imported one URL per line. Names use the middle domain label unless a name regex supplies a capture group.
+
+The admin console includes online documentation at `/ui/docs` after login.
+
 ### Supported outbound node types
 
 - For sing-box JSON/raw outbounds: `socks`, `http`, `shadowsocks`, `vmess`, `trojan`, `wireguard`, `hysteria`, `vless`, `shadowtls`, `tuic`, `hysteria2`, `anytls`, `ssh`.
@@ -94,7 +98,7 @@ services:
       - ./data/log:/var/log/resin
 ```
 
-Run `docker compose up -d` to start the service.
+Run `docker compose up -d --build` to start the service. When `RESIN_VERSION` is unset, the UI version comes from the `VERSION` file at the repository root. It is currently `v1.3.0`. Set `RESIN_VERSION` only when you need to override it.
 
 Custom endpoint ports must also be reachable from outside the container. Docker cannot add published ports to an already-running container, so pre-publish the required port range in `ports` (for example `"2300-2399:2300-2399"`) or use host networking where appropriate.
 
